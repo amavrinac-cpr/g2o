@@ -42,7 +42,7 @@
           <string>Draw Axis</string>
          </property>
          <property name="checked">
-          <bool>true</bool>
+          <bool>false</bool>
          </property>
         </widget>
        </item>
@@ -291,6 +291,7 @@
     <addaction name="actionDump_Images"/>
     <addaction name="separator"/>
     <addaction name="actionProperties"/>
+    <addaction name="actionOrthographic"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
@@ -332,6 +333,14 @@
   <action name="actionProperties">
    <property name="text">
     <string>Draw Options</string>
+   </property>
+  </action>
+  <action name="actionOrthographic">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Orthographic Projection</string>
    </property>
   </action>
   <action name="actionSave_Screenshot">

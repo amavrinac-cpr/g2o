@@ -62,11 +62,24 @@ namespace g2o {
 
       virtual void initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to);
 
+      Isometry3 getMeasurementPlusOffsets();
     protected:
       virtual bool resolveCaches();
       ParameterSE3Offset *_offsetFrom, *_offsetTo;
       CacheSE3Offset  *_cacheFrom, *_cacheTo;
   };
+
+#ifdef G2O_HAVE_OPENGL
+  /**
+   * \brief Visualize a 3D pose-pose constraint
+   */
+  class G2O_TYPES_SLAM3D_API EdgeSE3OffsetDrawAction: public EdgeSE3DrawAction {
+  public:
+    EdgeSE3OffsetDrawAction();
+    virtual HyperGraphElementAction* operator()(HyperGraph::HyperGraphElement* element,
+            HyperGraphElementAction::Parameters* params_);
+  };
+#endif
 
 } // end namespace
 #endif

@@ -103,6 +103,12 @@ namespace g2o {
     EdgeSE3DrawAction();
     virtual HyperGraphElementAction* operator()(HyperGraph::HyperGraphElement* element, 
             HyperGraphElementAction::Parameters* params_);
+    virtual bool refreshPropertyPtrs(HyperGraphElementAction::Parameters* params_);
+    void drawUncertainty(Isometry3& measuredTo, EdgeSE3::InformationType& infoMat);
+    void  drawMeasurementAndError(Eigen::Vector3f& fromPos,
+                                  Eigen::Vector3f& estToPos,
+                                  Eigen::Vector3f& measToPos);
+    BoolProperty* _showMeasurementAndError, *_showEllipsoid;
   };
 #endif
 

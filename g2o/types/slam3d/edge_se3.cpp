@@ -142,7 +142,55 @@ namespace g2o {
   }
 
 #ifdef G2O_HAVE_OPENGL
+  bool EdgeSE3DrawAction::refreshPropertyPtrs(HyperGraphElementAction::Parameters* params_){
+    if (!DrawAction::refreshPropertyPtrs(params_))
+      return false;
+    if (_previousParams){
+      _showMeasurementAndError = _previousParams->makeProperty<BoolProperty>(_typeName + "::SHOW_MEASUREMENT_AND_ERROR", false);
+      _showEllipsoid = _previousParams->makeProperty<BoolProperty>(_typeName + "::SHOW_STD_DEV", false);
+    } else {
+      _showMeasurementAndError = 0;
+      _showEllipsoid = 0;
+    }
+    return true;
+  }
+
   EdgeSE3DrawAction::EdgeSE3DrawAction(): DrawAction(typeid(EdgeSE3).name()){}
+
+  void  EdgeSE3DrawAction::drawMeasurementAndError(Eigen::Vector3f& fromPos,
+                                                   Eigen::Vector3f& estToPos,
+                                                   Eigen::Vector3f& measToPos)
+  {
+      glPushAttrib(GL_LINE_BIT);
+      glLineStipple(1, 0xAAAA);
+      glLineWidth(EDGE_LINE_WIDTH);
+      glEnable(GL_LINE_STIPPLE);
+      glBegin(GL_LINES);
+      //Measured transformation in yellow
+      glColor3f(POSE_EDGE_MEASUREMENT_COLOR);
+      glVertex3f(fromPos.x(),fromPos.y(),fromPos.z());
+      glVertex3f(measToPos.x(),measToPos.y(),measToPos.z());
+      //and difference to estimate in dotted red
+      glColor3f(POSE_EDGE_ERROR_COLOR);
+      glVertex3f(measToPos.x(),measToPos.y(),measToPos.z());
+      glVertex3f(estToPos.x(),estToPos.y(),estToPos.z());
+      glEnd();
+      glPopAttrib();
+  }
+
+  void EdgeSE3DrawAction::drawUncertainty(Isometry3& measuredTo, EdgeSE3::InformationType& infoMat)
+  {
+      //Draw uncertainty ellipsoid for one std dev
+      glColor3f(EDGE_UNCERTAINTY_ELLIPSOID_COLOR);
+      glPushMatrix();
+      glPushAttrib(GL_POLYGON_BIT);
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);//Draw wireframe
+      glMultMatrixd(measuredTo.matrix().data());
+      EdgeSE3::InformationType cov = infoMat.inverse();
+      opengl::drawEllipsoid(3*sqrt(cov(0,0)), 3*sqrt(cov(1,1)), 3*sqrt(cov(2,2)));
+      glPopAttrib();//Restore from wireframe
+      glPopMatrix();
+  }
 
   HyperGraphElementAction* EdgeSE3DrawAction::operator()(HyperGraph::HyperGraphElement* element, 
                HyperGraphElementAction::Parameters* params_){
@@ -155,19 +203,34 @@ namespace g2o {
     if (_show && !_show->value())
       return this;
     
-    EdgeSE3* e =  static_cast<EdgeSE3*>(element);
-    VertexSE3* fromEdge = static_cast<VertexSE3*>(e->vertices()[0]);
-    VertexSE3* toEdge   = static_cast<VertexSE3*>(e->vertices()[1]);
-    if (! fromEdge || ! toEdge)
+    auto* edge = static_cast<EdgeSE3*>(element);
+    auto* from = static_cast<VertexSE3*>(edge->vertices()[0]);
+    auto* to   = static_cast<VertexSE3*>(edge->vertices()[1]);
+    Eigen::Vector3f fromPos = from->estimate().translation().cast<float>();
+    Eigen::Vector3f estToPos = to->estimate().translation().cast<float>();
+    Isometry3 measuredTo = (from->estimate() * edge->measurement());
+    Eigen::Vector3f measToPos = measuredTo.translation().cast<float>();
+    if (! from || ! to)
       return this;
-    glColor3f(POSE_EDGE_COLOR);
     glPushAttrib(GL_ENABLE_BIT);
+    glPushAttrib(GL_LINE_BIT);
     glDisable(GL_LIGHTING);
+    glLineWidth(EDGE_LINE_WIDTH);
     glBegin(GL_LINES);
-    glVertex3f((float)fromEdge->estimate().translation().x(),(float)fromEdge->estimate().translation().y(),(float)fromEdge->estimate().translation().z());
-    glVertex3f((float)toEdge->estimate().translation().x(),(float)toEdge->estimate().translation().y(),(float)toEdge->estimate().translation().z());
+    glColor3f(POSE_EDGE_COLOR);
+    glVertex3f(fromPos.x(),fromPos.y(),fromPos.z());
+    glVertex3f(estToPos.x(),estToPos.y(),estToPos.z());
     glEnd();
-    glPopAttrib();
+
+    if(_showMeasurementAndError && _showMeasurementAndError->value()){
+      drawMeasurementAndError(fromPos, estToPos, measToPos);
+    }
+     if(_showEllipsoid && _showEllipsoid->value()){
+      drawUncertainty(measuredTo, edge->information());
+    }
+
+    glPopAttrib();//restore Line width
+    glPopAttrib();//restore enable bit (lighting?)
     return this;
   }
 #endif

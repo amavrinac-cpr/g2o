@@ -79,6 +79,8 @@ namespace g2o {
     }
 
     virtual void initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to);
+    Vector3 getReprojectedMeasurement();
+    InformationType getReprojectedInformation();
 
   private:
     Eigen::Matrix<number_t,3,9,Eigen::ColMajor> J; // jacobian before projection
@@ -87,6 +89,23 @@ namespace g2o {
     ParameterCamera* params;
     CacheCamera* cache;
   };
+#ifdef G2O_HAVE_OPENGL
+  /**
+   * \brief Visualize a 3D pose-pose constraint
+   */
+  class G2O_TYPES_SLAM3D_API EdgeSE3PointXYZDepthDrawAction: public DrawAction{
+  public:
+    EdgeSE3PointXYZDepthDrawAction();
+    virtual HyperGraphElementAction* operator()(HyperGraph::HyperGraphElement* element,
+            HyperGraphElementAction::Parameters* params_);
+    virtual bool refreshPropertyPtrs(HyperGraphElementAction::Parameters* params_);
+    void drawUncertainty(Isometry3& measuredTo, EdgeSE3PointXYZDepth::InformationType& infoMat);
+    void  drawMeasurementAndError(Eigen::Vector3f& fromPos,
+                                  Eigen::Vector3f& estToPos,
+                                  Eigen::Vector3f& measToPos);
+    BoolProperty* _showMeasurementAndError, *_showEllipsoid, *_showEdge;
+  };
+#endif
 
 }
 #endif

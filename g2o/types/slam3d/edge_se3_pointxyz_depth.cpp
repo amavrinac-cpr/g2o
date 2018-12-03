@@ -25,6 +25,10 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "edge_se3_pointxyz_depth.h"
+#ifdef G2O_HAVE_OPENGL
+#include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
+#endif
 
 namespace g2o {
   using namespace g2o;
@@ -153,6 +157,22 @@ namespace g2o {
     return true;
   }
 
+  EdgeSE3PointXYZDepth::InformationType EdgeSE3PointXYZDepth::getReprojectedInformation()
+  {
+    const Eigen::Matrix<double, 2, 2, Eigen::ColMajor>& invKcam = params->Kcam().topLeftCorner<2, 2>();
+    InformationType m = information();
+    m.topLeftCorner<2,2>() = invKcam.transpose() * m.topLeftCorner<2,2>() * invKcam;//not 100% sure about this
+    return m;
+  }
+  Vector3 EdgeSE3PointXYZDepth::getReprojectedMeasurement()
+  {
+    const Eigen::Matrix<double, 3, 3, Eigen::ColMajor>& invKcam = params->invKcam();
+    Vector3 p;
+    p(2) = _measurement(2);
+    p.head<2>() = _measurement.head<2>()*p(2);
+    p=invKcam*p;
+    return params->offset() * p;
+  }
 
   void EdgeSE3PointXYZDepth::initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* /*to_*/)
   {
@@ -168,5 +188,96 @@ namespace g2o {
     p=invKcam*p;
     point->setEstimate(cam->estimate() * (params->offset() * p));
   }
+
+#ifdef G2O_HAVE_OPENGL
+   bool EdgeSE3PointXYZDepthDrawAction::refreshPropertyPtrs(HyperGraphElementAction::Parameters* params_){
+    if (!DrawAction::refreshPropertyPtrs(params_))
+      return false;
+    if (_previousParams){
+      _showMeasurementAndError = _previousParams->makeProperty<BoolProperty>(_typeName + "::SHOW_MEASUREMENT_AND_ERROR", false);
+      _showEllipsoid = _previousParams->makeProperty<BoolProperty>(_typeName + "::SHOW_STD_DEV", false);
+      _showEdge = _previousParams->makeProperty<BoolProperty>(_typeName + "::SHOW_EDGE", false);
+    } else {
+      _showMeasurementAndError = 0;
+      _showEllipsoid = 0;
+      _showEdge = 0;
+    }
+    return true;
+  }
+   EdgeSE3PointXYZDepthDrawAction::EdgeSE3PointXYZDepthDrawAction(): DrawAction(typeid(EdgeSE3PointXYZDepth).name()){}
+   void  EdgeSE3PointXYZDepthDrawAction::drawMeasurementAndError(Eigen::Vector3f& fromPos,
+                                                                Eigen::Vector3f& estToPos,
+                                                                Eigen::Vector3f& measToPos)
+  {
+      glPushAttrib(GL_LINE_BIT);
+      glLineStipple(1, 0xAAAA);
+      glLineWidth(EDGE_LINE_WIDTH);
+      glEnable(GL_LINE_STIPPLE);
+      glBegin(GL_LINES);
+      //Measured transformation in yellow
+      glColor3f(POSE_EDGE_MEASUREMENT_COLOR);
+      glVertex3f(fromPos.x(),fromPos.y(),fromPos.z());
+      glVertex3f(measToPos.x(),measToPos.y(),measToPos.z());
+      //and difference to estimate in dotted red
+      glColor3f(POSE_EDGE_ERROR_COLOR);
+      glVertex3f(measToPos.x(),measToPos.y(),measToPos.z());
+      glVertex3f(estToPos.x(),estToPos.y(),estToPos.z());
+      glEnd();
+      glPopAttrib();
+  }
+   void EdgeSE3PointXYZDepthDrawAction::drawUncertainty(Isometry3& measuredTo, EdgeSE3PointXYZDepth::InformationType& infoMat) {
+      //Draw uncertainty ellipsoid for one std dev
+      glColor3f(EDGE_UNCERTAINTY_ELLIPSOID_COLOR);
+      glPushMatrix();
+      glPushAttrib(GL_POLYGON_BIT);
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);//Draw wireframe
+      glMultMatrixd(measuredTo.matrix().data());
+      opengl::drawEllipsoid(sqrt(1./infoMat(0,0)), sqrt(1./infoMat(1,1)), sqrt(1./infoMat(2,2)));
+      glPopAttrib();//Restore from wireframe
+      glPopMatrix();
+  }
+   HyperGraphElementAction* EdgeSE3PointXYZDepthDrawAction::operator()(HyperGraph::HyperGraphElement* element,
+               HyperGraphElementAction::Parameters* params_){
+    if (typeid(*element).name()!=_typeName)
+      return 0;
+    refreshPropertyPtrs(params_);
+    if (! _previousParams)
+      return this;
+
+    if (_show && !_show->value())
+      return this;
+
+    auto* edge = static_cast<EdgeSE3PointXYZDepth*>(element);
+    auto* from = static_cast<VertexSE3*>(edge->vertices()[0]);
+    auto* to   = static_cast<VertexPointXYZ*>(edge->vertices()[1]);
+    Eigen::Vector3f fromPos = from->estimate().translation().cast<float>();
+    Eigen::Vector3f estToPos = to->estimate().cast<float>();
+    Eigen::Vector3f measToPos = (from->estimate() * edge->getReprojectedMeasurement()).cast<float>();
+    Isometry3 measuredTo = (from->estimate() * Eigen::Translation3d(edge->getReprojectedMeasurement()));
+    if (! from || ! to)
+      return this;
+     glPushAttrib(GL_ENABLE_BIT);
+    glPushAttrib(GL_LINE_BIT);
+     glDisable(GL_LIGHTING);
+    if(_showEdge && _showEdge->value()){
+      glLineWidth(EDGE_LINE_WIDTH);
+      glBegin(GL_LINES);
+      glColor3f(POSE_EDGE_COLOR);
+      glVertex3f(fromPos.x(),fromPos.y(),fromPos.z());
+      glVertex3f(estToPos.x(),estToPos.y(),estToPos.z());
+      glEnd();
+      glPopAttrib();//restore Line width
+    }
+     if(_showMeasurementAndError && _showMeasurementAndError->value()){
+      drawMeasurementAndError(fromPos, estToPos, measToPos);
+    }
+     if(_showEllipsoid && _showEllipsoid->value()){
+      auto infoMatLvalue = edge->getReprojectedInformation();
+      drawUncertainty(measuredTo, infoMatLvalue);
+    }
+     glPopAttrib();//restore enable bit (lighting?)
+    return this;
+  }
+ #endif
 
 }

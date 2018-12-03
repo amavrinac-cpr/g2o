@@ -393,6 +393,13 @@ void MainWindow::on_actionDefault_Background_triggered(bool)
   viewer->update();
 }
 
+void MainWindow::on_actionOrthographic_triggered(bool flag)
+{
+  typedef qglviewer::Camera::Type ProjType;
+  ProjType t = flag ? ProjType::ORTHOGRAPHIC : ProjType::PERSPECTIVE;
+  viewer->camera()->setType(t);
+}
+
 void MainWindow::on_actionProperties_triggered(bool)
 {
   if (! _viewerPropertiesWidget) {

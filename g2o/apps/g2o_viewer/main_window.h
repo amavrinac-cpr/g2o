@@ -67,6 +67,7 @@ class G2O_VIEWER_API MainWindow : public QMainWindow, public Ui::BaseMainWindow
     void on_actionWhite_Background_triggered(bool);
     void on_actionDefault_Background_triggered(bool);
     void on_actionProperties_triggered(bool);
+    void on_actionOrthographic_triggered(bool);
     void on_actionSave_Screenshot_triggered(bool);
     void on_actionLoad_Viewer_State_triggered(bool);
     void on_actionSave_Viewer_State_triggered(bool);

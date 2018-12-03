@@ -29,6 +29,7 @@
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
 #include "g2o/stuff/opengl_primitives.h"
+#include "EXTERNAL/freeglut/freeglut_minimal.h"
 #endif
 
 #include <iostream>
@@ -107,13 +108,25 @@ namespace g2o {
     if (!DrawAction::refreshPropertyPtrs(params_))
       return false;
     if (_previousParams){
-      _triangleX = _previousParams->makeProperty<FloatProperty>(_typeName + "::TRIANGLE_X", .2f);
-      _triangleY = _previousParams->makeProperty<FloatProperty>(_typeName + "::TRIANGLE_Y", .05f);
+      _triangleX = _previousParams->makeProperty<FloatProperty>(_typeName + "::TRIANGLE_X", .02f);
+      _triangleY = _previousParams->makeProperty<FloatProperty>(_typeName + "::TRIANGLE_Y", .01f);
+      _idSize    = _previousParams->makeProperty<FloatProperty>(_typeName + "::ID_SIZE", 1.f);
     } else {
       _triangleX = 0;
       _triangleY = 0;
     }
     return true;
+  }
+
+  void drawId(std::string id, float userScale){
+      double scale = 0.00005 * userScale;
+      glPushMatrix();
+      glScaled(scale, scale, scale);
+      glPushAttrib(GL_LINE_BIT);
+      glLineWidth(4);
+      freeglut_minimal::glutStrokeString(freeglut_minimal::GLUT_STROKE_ROMAN, id.c_str());
+      glPopAttrib();
+      glPopMatrix();
   }
 
   HyperGraphElementAction* VertexSE3DrawAction::operator()(HyperGraph::HyperGraphElement* element, 
@@ -137,6 +150,12 @@ namespace g2o {
     opengl::drawArrow2D(_triangleX->value(), _triangleY->value(), _triangleX->value()*.3f);
     drawCache(that->cacheContainer(), params_);
     drawUserData(that->userData(), params_);
+
+    if(_showId && _showId->value()){
+      float scale = _idSize ? _idSize->value() : 1.f;
+      drawId(std::to_string(that->id()), scale);
+    }
+
     glPopMatrix();
     return this;
   }

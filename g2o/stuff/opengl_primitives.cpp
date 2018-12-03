@@ -177,7 +177,7 @@ void drawEllipsoid(GLfloat r1, GLfloat r2, GLfloat r3)
     glEnable(GL_NORMALIZE);
   glPushMatrix();
   glScalef(r1, r2, r3);
-  gluSphere(GLUWrapper::getQuadradic(), 1.0f, 32, 32);
+  gluSphere(GLUWrapper::getQuadradic(), 1.0f, 16, 16);
   glPopMatrix();
   if (!hasNormalization)
     glDisable(GL_NORMALIZE);

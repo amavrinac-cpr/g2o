@@ -145,6 +145,8 @@ void G2oQGLViewer::init()
 #ifdef QGLVIEWER_DEPRECATED_MOUSEBINDING
   setMouseBinding(Qt::NoModifier, Qt::RightButton, CAMERA, TRANSLATE);
   setMouseBinding(Qt::NoModifier, Qt::MidButton, CAMERA, TRANSLATE);
+  setMouseBinding(Qt::NoModifier, Qt::RightButton, SHOW_ENTIRE_SCENE, true, Qt::NoButton);
+  setMouseBinding(Qt::NoModifier, Qt::LeftButton, ZOOM_TO_FIT, true, Qt::NoButton);
 #else
   setMouseBinding(Qt::RightButton, CAMERA, TRANSLATE);
   setMouseBinding(Qt::MidButton, CAMERA, TRANSLATE);

@@ -100,6 +100,9 @@ namespace g2o {
     } else {
       _cubeSide = 0;
     }
+    if(_show){
+      _show->setValue(false);//invisible by default
+    }
     return true;
   }
 

@@ -27,8 +27,12 @@
 #include "edge_se3_offset.h"
 #include "isometry3d_gradients.h"
 #include "parameter_se3_offset.h"
-
 #include <iostream>
+
+#ifdef G2O_HAVE_OPENGL
+#include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
+#endif
 
 namespace g2o {
   using namespace std;
@@ -131,6 +135,10 @@ namespace g2o {
     internal::computeEdgeSE3Gradient(E, _jacobianOplusXi , _jacobianOplusXj, Z, Xi, Xj, Pi, Pj);
   }
 
+  Isometry3 EdgeSE3Offset::getMeasurementPlusOffsets() {
+    return _cacheFrom->offsetParam()->offset() * measurement() * _cacheTo->offsetParam()->offset().inverse();
+  }
+
   void EdgeSE3Offset::initialEstimate(const OptimizableGraph::VertexSet& from_, OptimizableGraph::Vertex* /*to_*/) {
     VertexSE3 *from = static_cast<VertexSE3*>(_vertices[0]);
     VertexSE3 *to   = static_cast<VertexSE3*>(_vertices[1]);
@@ -143,4 +151,49 @@ namespace g2o {
       from->setEstimate(to->estimate() * virtualMeasurement.inverse());
   }
 
+#ifdef G2O_HAVE_OPENGL
+  EdgeSE3OffsetDrawAction::EdgeSE3OffsetDrawAction(): EdgeSE3DrawAction() {
+    DrawAction::setTypeName(typeid(EdgeSE3Offset).name());
+  }
+   HyperGraphElementAction* EdgeSE3OffsetDrawAction::operator()(HyperGraph::HyperGraphElement* element,
+               HyperGraphElementAction::Parameters* params_){
+    if (typeid(*element).name()!=_typeName)
+      return 0;
+    refreshPropertyPtrs(params_);
+    if (! _previousParams)
+      return this;
+
+    if (_show && !_show->value())
+      return this;
+
+    auto* edge = static_cast<EdgeSE3Offset*>(element);
+    auto* from = static_cast<VertexSE3*>(edge->vertices()[0]);
+    auto* to   = static_cast<VertexSE3*>(edge->vertices()[1]);
+    Eigen::Vector3f fromPos = from->estimate().translation().cast<float>();
+    Eigen::Vector3f estToPos = to->estimate().translation().cast<float>();
+    Isometry3 measuredTo = (from->estimate() * edge->getMeasurementPlusOffsets());
+    Eigen::Vector3f measToPos = measuredTo.translation().cast<float>();
+    if (! from || ! to)
+      return this;
+    glPushAttrib(GL_ENABLE_BIT);
+    glDisable(GL_LIGHTING);
+    glPushAttrib(GL_LINE_BIT);
+    glLineWidth(EDGE_LINE_WIDTH);
+    glBegin(GL_LINES);
+    glColor3f(POSE_EDGE_OFFSET_COLOR);
+    glVertex3f(fromPos.x(),fromPos.y(),fromPos.z());
+    glVertex3f(estToPos.x(),estToPos.y(),estToPos.z());
+    glEnd();
+    glPopAttrib();//restore Line width
+
+    if(_showMeasurementAndError && _showMeasurementAndError->value()){
+      drawMeasurementAndError(fromPos, estToPos, measToPos);
+    }
+     if(_showEllipsoid && _showEllipsoid->value()){
+      drawUncertainty(measuredTo, edge->information());
+    }
+
+    return this;
+  }
+#endif
 }
